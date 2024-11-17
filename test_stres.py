@@ -1,9 +1,10 @@
 import unittest
 from unittest.mock import patch, Mock
 import time
-from app import app, getmoviedetails, get_country_flag
+import threading
+from app import app
 
-class MovieWithFlagAppTestCase(unittest.TestCase):
+class StressTestMovieWithFlagAppTestCase(unittest.TestCase):
 
     @classmethod
     def setUpClass(cls):
@@ -11,18 +12,24 @@ class MovieWithFlagAppTestCase(unittest.TestCase):
         cls.client = app.test_client()
         app.config['TESTING'] = True
 
-    def notest_integration(self):
-        response = self.client.get("/api/movies?filter=superman")
-        self.assertEqual(response.status_code, 200)
+    def stress_test_movie_searchapi(self):
+        def make_request():
+            response = self.client.get("/api/movies?filter=superman")
+            self.assertEqual(response.status_code, 200)
 
-        # The response should be JSON and contain data
-        data = response.get_json()
-        self.assertIsInstance(data, list)
-        self.assertEqual(len(data), 10)
-        for movie in data:
-            self.assertIsNotNone(movie["title"])
-            self.assertIsNotNone(movie["year"])
-            self.assertIsNotNone(movie["countries"])
+        num_threads = 50
+        threads = []
+
+        for _ in range(num_threads):
+            thread = threading.Thread(target=make_request)
+            thread.start()
+            threads.append(thread)
+
+        # Esperar a que todos los hilos terminen
+        for thread in threads:
+            thread.join()
+
+
 
     @patch("app.searchfilms")
     @patch("app.getmoviedetails")
@@ -75,7 +82,6 @@ class MovieWithFlagAppTestCase(unittest.TestCase):
         response = self.client.get("/api/movies?filter=superman")
         self.assertEqual(response.status_code, 200)
 
-        # The response should be JSON and contain data
         data = response.get_json()
         self.assertIsInstance(data, list)
         self.assertEqual(len(data), 10)
@@ -91,5 +97,6 @@ class MovieWithFlagAppTestCase(unittest.TestCase):
             self.assertEqual(movie["countries"][1]["flag"], "https://flagcdn.com/us.svg")
             self.assertEqual(movie["countries"][2]["flag"], "https://flagcdn.com/us.svg")
             self.assertEqual(movie["countries"][3]["flag"], "https://flagcdn.com/us.svg")
-    
-    
+
+if __name__ == "__main__":
+    unittest.main()
